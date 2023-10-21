@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE users (
+CREATE TABLE tasks (
   id VARCHAR NOT NULL PRIMARY KEY,
   name VARCHAR NOT NULL
 )

@@ -1,7 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    users (id) {
+    tasks (id) {
         id -> Text,
         name -> Text,
     }

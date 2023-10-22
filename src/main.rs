@@ -17,20 +17,29 @@ mod schema;
 /// Short-hand for the database pool type to use throughout the app.
 type DbPool = r2d2::Pool<r2d2::ConnectionManager<SqliteConnection>>;
 
-/// Finds task by UID.
-///
-/// Extracts:
-/// - the database pool handle from application data
-/// - a task UID from the request path
-#[get("/task/{task_id}")]
-async fn get_task(pool: web::Data<DbPool>, task_uid: web::Path<Uuid>) -> actix_web::Result<impl Responder> {
-    let task_uid = task_uid.into_inner();
+/// Get all tasks
+#[get("/tasks")]
+async fn get_all_tasks(pool: web::Data<DbPool>) -> actix_web::Result<impl Responder> {
+    let tasks = web::block(move || {
+        let mut conn = pool.get()?;
+        actions::find_all_tasks(&mut conn)
+    })
+    .await?
+    .map_err(error::ErrorInternalServerError)?;
 
-    // use web::block to offload blocking Diesel queries without blocking server thread
+    Ok(HttpResponse::Ok().json(tasks))
+}
+
+/// Finds task by UID.
+#[get("/task/{task_id}")]
+async fn get_task(
+    pool: web::Data<DbPool>,
+    task_uid: web::Path<Uuid>,
+) -> actix_web::Result<impl Responder> {
+    let task_uid = task_uid.into_inner();
     let task = web::block(move || {
         // note that obtaining a connection from the pool is also potentially blocking
         let mut conn = pool.get()?;
-
         actions::find_task_by_uid(&mut conn, task_uid)
     })
     .await?
@@ -38,33 +47,25 @@ async fn get_task(pool: web::Data<DbPool>, task_uid: web::Path<Uuid>) -> actix_w
     .map_err(error::ErrorInternalServerError)?;
 
     Ok(match task {
-        // user was found; return 200 response with JSON formatted user object
         Some(task) => HttpResponse::Ok().json(task),
-
-        // user was not found; return 404 response with error message
         None => HttpResponse::NotFound().body(format!("No task found with UID: {task_uid}")),
     })
 }
 
-/// Creates new user.
-///
-/// Extracts:
-/// - the database pool handle from application data
-/// - a JSON form containing new user info from the request body
+/// Creates new task.
 #[post("/task")]
-async fn add_task(pool: web::Data<DbPool>, form: web::Json<models::NewTask>) -> actix_web::Result<impl Responder> {
-    // use web::block to offload blocking Diesel queries without blocking server thread
+async fn add_task(
+    pool: web::Data<DbPool>,
+    form: web::Json<models::NewTask>,
+) -> actix_web::Result<impl Responder> {
     let task = web::block(move || {
-        // note that obtaining a connection from the pool is also potentially blocking
         let mut conn = pool.get()?;
 
         actions::insert_new_task(&mut conn, &form.name, &form.done)
     })
     .await?
-    // map diesel query errors to a 500 error response
     .map_err(error::ErrorInternalServerError)?;
 
-    // user was added successfully; return 201 response with new user info
     Ok(HttpResponse::Created().json(task))
 }
 
@@ -87,6 +88,7 @@ async fn main() -> std::io::Result<()> {
             // add route handlers
             .service(get_task)
             .service(add_task)
+            .service(get_all_tasks)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
@@ -126,7 +128,7 @@ mod tests {
         )
         .await;
 
-        // send something that isn't a UUID to `get_user`
+        // send something that isn't a UUID to `get_task`
         let req = test::TestRequest::get().uri("/task/123").to_request();
         let res = test::call_service(&app, req).await;
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
@@ -136,7 +138,7 @@ mod tests {
             "unexpected body: {body:?}",
         );
 
-        // try to find a non-existent user
+        // try to find a non-existent task
         let req = test::TestRequest::get()
             .uri(&format!("/task/{}", Uuid::nil()))
             .to_request();
@@ -144,7 +146,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
         let body = test::read_body(res).await;
         assert!(
-            body.starts_with(b"No user found"),
+            body.starts_with(b"No task found"),
             "unexpected body: {body:?}",
         );
 
@@ -156,17 +158,17 @@ mod tests {
         let res: models::Task = test::call_and_read_body_json(&app, req).await;
         assert_eq!(res.name, "Test task");
 
-        // get a user
+        // get a task
         let req = test::TestRequest::get()
             .uri(&format!("/task/{}", res.id))
             .to_request();
         let res: models::Task = test::call_and_read_body_json(&app, req).await;
         assert_eq!(res.name, "Test task");
 
-        // delete new user from table
+        // delete new task from table
         use crate::schema::tasks::dsl::*;
         diesel::delete(tasks.filter(id.eq(res.id)))
             .execute(&mut pool.get().expect("couldn't get db connection from pool"))
-            .expect("couldn't delete test user from table");
+            .expect("couldn't delete test task from table");
     }
 }

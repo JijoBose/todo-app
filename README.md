@@ -9,7 +9,7 @@ Setup the database and migration
 
 **Create new table**
 
-``diesel migration generate create_users``
+``diesel migration generate create_tasks``
 
 Run Migration
 

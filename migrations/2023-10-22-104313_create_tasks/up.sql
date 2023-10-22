@@ -1,5 +1,6 @@
 -- Your SQL goes here
 CREATE TABLE tasks (
   id VARCHAR NOT NULL PRIMARY KEY,
-  name VARCHAR NOT NULL
+  name VARCHAR NOT NULL,
+  done BOOLEAN NOT NULL DEFAULT false
 )

@@ -4,5 +4,6 @@ diesel::table! {
     tasks (id) {
         id -> Text,
         name -> Text,
+        done -> Bool,
     }
 }

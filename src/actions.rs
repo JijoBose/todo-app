@@ -18,7 +18,7 @@ pub fn find_task_by_uid(conn: &mut SqliteConnection, uid: Uuid) -> Result<Option
 }
 
 /// Run query using Diesel to insert a new database row and return the result.
-pub fn insert_new_task(conn: &mut SqliteConnection, nm: &str) -> Result<models::Task, DbError> {
+pub fn insert_new_task(conn: &mut SqliteConnection, nm: &str, dn: &bool) -> Result<models::Task, DbError> {
     // It is common when using Diesel with Actix Web to import schema-related
     // modules inside a function's scope (rather than the normal module's scope)
     // to prevent import collisions and namespace pollution.
@@ -27,6 +27,7 @@ pub fn insert_new_task(conn: &mut SqliteConnection, nm: &str) -> Result<models::
     let new_task = models::Task {
         id: Uuid::new_v4().to_string(),
         name: nm.to_owned(),
+        done: *dn,
     };
 
     diesel::insert_into(tasks).values(&new_task).execute(conn)?;

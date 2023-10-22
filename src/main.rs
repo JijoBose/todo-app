@@ -58,7 +58,7 @@ async fn add_task(pool: web::Data<DbPool>, form: web::Json<models::NewTask>) -> 
         // note that obtaining a connection from the pool is also potentially blocking
         let mut conn = pool.get()?;
 
-        actions::insert_new_task(&mut conn, &form.name)
+        actions::insert_new_task(&mut conn, &form.name, &form.done)
     })
     .await?
     // map diesel query errors to a 500 error response
@@ -151,7 +151,7 @@ mod tests {
         // create new task
         let req = test::TestRequest::post()
             .uri("/task")
-            .set_json(models::NewTask::new("Test task"))
+            .set_json(models::NewTask::new("Test task", false))
             .to_request();
         let res: models::Task = test::call_and_read_body_json(&app, req).await;
         assert_eq!(res.name, "Test task");

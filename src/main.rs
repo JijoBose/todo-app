@@ -7,18 +7,15 @@
 extern crate diesel;
 
 use actix_web::{error, get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
-use diesel::{prelude::*, r2d2};
 use uuid::Uuid;
 
 use crate::initdb::initialize_db_pool;
+use crate::initdb::DbPool;
 
 mod actions;
 mod models;
 mod schema;
 mod initdb;
-
-/// Short-hand for the database pool type to use throughout the app.
-type DbPool = r2d2::Pool<r2d2::ConnectionManager<SqliteConnection>>;
 
 /// Get all tasks
 #[get("/tasks")]

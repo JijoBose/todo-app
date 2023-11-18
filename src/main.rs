@@ -6,20 +6,29 @@
 #[macro_use]
 extern crate diesel;
 
-use actix_web::{error, get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::web::Json;
+use actix_web::{
+    delete, error, get, middleware, post, web, App, HttpResponse, HttpServer, Responder, Result,
+};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::initdb::initialize_db_pool;
 use crate::initdb::DbPool;
 
 mod actions;
+mod initdb;
 mod models;
 mod schema;
-mod initdb;
+
+#[derive(Serialize)]
+struct Response {
+    message: String,
+}
 
 /// Get all tasks
 #[get("/tasks")]
-async fn get_all_tasks(pool: web::Data<DbPool>) -> actix_web::Result<impl Responder> {
+async fn get_all_tasks(pool: web::Data<DbPool>) -> Result<impl Responder> {
     let tasks = web::block(move || {
         let mut conn = pool.get()?;
         actions::find_all_tasks(&mut conn)
@@ -30,12 +39,34 @@ async fn get_all_tasks(pool: web::Data<DbPool>) -> actix_web::Result<impl Respon
     Ok(HttpResponse::Ok().json(tasks))
 }
 
+#[delete("/tasks/{task_id}")]
+async fn delete_task(pool: web::Data<DbPool>, task_uid: web::Path<Uuid>,) -> Result<Json<Response>> {
+  let uid: Uuid = task_uid.clone();
+  let conn_result = pool.get();
+
+  match conn_result {
+    Ok(mut conn) => {
+      match actions::destroy_task(&mut conn, uid) {
+        Ok(_rows_deleted) => {
+          Ok(web::Json(Response { message: "deleted".to_string()}))
+        }
+        Err(err) => {
+          Ok(web::Json(Response { message: err.to_string() }))
+        }
+      }
+    }
+    Err(err) => {
+      Ok(web::Json(Response { message: err.to_string() }))
+    }
+  }
+}
+
 /// Finds task by UID.
 #[get("/task/{task_id}")]
 async fn get_task(
     pool: web::Data<DbPool>,
     task_uid: web::Path<Uuid>,
-) -> actix_web::Result<impl Responder> {
+) -> Result<impl Responder> {
     let task_uid = task_uid.into_inner();
     let task = web::block(move || {
         // note that obtaining a connection from the pool is also potentially blocking
@@ -57,7 +88,7 @@ async fn get_task(
 async fn add_task(
     pool: web::Data<DbPool>,
     form: web::Json<models::NewTask>,
-) -> actix_web::Result<impl Responder> {
+) -> Result<impl Responder> {
     let task = web::block(move || {
         let mut conn = pool.get()?;
 
@@ -89,6 +120,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_task)
             .service(add_task)
             .service(get_all_tasks)
+            .service(delete_task)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

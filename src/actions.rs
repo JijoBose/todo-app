@@ -1,4 +1,4 @@
-use diesel::prelude::*;
+use diesel::{prelude::*, delete};
 use uuid::Uuid;
 
 use crate::models::{self, Task};
@@ -48,4 +48,9 @@ pub fn insert_new_task(
     diesel::insert_into(tasks).values(&new_task).execute(conn)?;
 
     Ok(new_task)
+}
+
+pub fn destroy_task(conn: &mut SqliteConnection, uid: Uuid) -> Result<usize, diesel::result::Error> {
+  use crate::schema::tasks::dsl::*;
+  Ok(delete(tasks.filter(id.eq(uid.to_string()))).execute(conn)?)
 }

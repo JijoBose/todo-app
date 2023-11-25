@@ -5,7 +5,8 @@ use actix_web::{middleware, web, App, test};
 use uuid::Uuid;
 
 // use crate::tests::initdb::initialize_db_pool;
-use crate::{get_task, add_task, models};
+use crate::{get_task, add_task};
+use crate::model::task;
 
 /// Short-hand for the database pool type to use throughout the app.
 type DbPool = r2d2::Pool<r2d2::ConnectionManager<SqliteConnection>>;
@@ -62,16 +63,16 @@ async fn task_routes() {
     // create new task
     let req = test::TestRequest::post()
         .uri("/task")
-        .set_json(models::NewTask::new("Test task", false))
+        .set_json(task::NewTask::new("Test task", false))
         .to_request();
-    let res: models::Task = test::call_and_read_body_json(&app, req).await;
+    let res: task::Task = test::call_and_read_body_json(&app, req).await;
     assert_eq!(res.name, "Test task");
 
     // get a task
     let req = test::TestRequest::get()
         .uri(&format!("/task/{}", res.id))
         .to_request();
-    let res: models::Task = test::call_and_read_body_json(&app, req).await;
+    let res: task::Task = test::call_and_read_body_json(&app, req).await;
     assert_eq!(res.name, "Test task");
 
     // delete new task from table

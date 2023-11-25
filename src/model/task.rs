@@ -1,3 +1,4 @@
+use diesel::{Queryable, prelude::Insertable};
 use serde::{Deserialize, Serialize};
 use crate::schema::tasks;
 
